@@ -30,6 +30,7 @@ Done: battery-optimization snackbar hidden on TV, Chromecast disabled on TV, str
 Back on the home page (web app calls `exitApp`): first focuses the page's `<nav>`, exits only from there (`focusNavOrExit`).
 WebView is laid out 1280 CSS px wide on TV (scaled to fit): TVs report 960dp, which frontends treat as a phone layout.
 Up from the topmost content scrolls to the top and keeps focus (undoes the web app's jump into a side nav; see nativeshell.js).
+Smooth window scrolls are ignored while focus is in a fixed element (web apps "revealing" a fixed side nav drifted the page).
 Note: custom frontends (e.g. AIOStreams) handle the d-pad themselves and ignore the `tv` layout; quirks there (like its
 fixed nav bar only being reachable from the end of the page) belong upstream, not in the app.
 

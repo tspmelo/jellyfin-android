@@ -139,6 +139,20 @@ if (isTv) {
         e.preventDefault();
         e.stopImmediatePropagation();
     }, true);
+
+    // Scrolling the page never moves fixed elements (e.g. a side nav), but some web apps still smooth-scroll the page
+    // to "reveal" one when it gets focus, drifting the content behind it. Ignore those scrolls.
+    const isInFixed = (el) => {
+        for (let p = el; p && p !== document.documentElement; p = p.parentElement) {
+            if (getComputedStyle(p).position === 'fixed') return true;
+        }
+        return false;
+    };
+    const scrollTo = window.scrollTo.bind(window);
+    window.scrollTo = (...args) => {
+        if (args[0]?.behavior === 'smooth' && isInFixed(document.activeElement)) return;
+        scrollTo(...args);
+    };
 }
 
 function getDeviceProfile(profileBuilder, item) {
