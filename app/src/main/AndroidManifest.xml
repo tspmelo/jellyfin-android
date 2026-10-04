@@ -21,9 +21,12 @@
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Android TV: don't require touch, and allow Ethernet-only devices (ACCESS_WIFI_STATE implies wifi) -->
+    <!-- Android TV: don't require touch, and allow devices without wifi or bluetooth (implied by permissions) -->
     <uses-feature
         android:name="android.hardware.touchscreen"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.bluetooth"
         android:required="false" />
     <uses-feature
         android:name="android.software.leanback"

@@ -43,10 +43,15 @@ fixed nav bar only being reachable from the end of the page) belong upstream, no
   once `hasChromecast()` is false.
 - Out of scope: download screens (`DownloadsScreen`).
 
-## Phase 4 — later, if wanted
+## Phase 4 — passthrough + Play Store ✅ done
 
-- Audio passthrough (AC3/EAC3/DTS) in `DeviceProfileBuilder`.
-- Play Store TV quality checklist.
+- Audio passthrough: no code needed. Media3's `DefaultAudioSink` (built by `DefaultRenderersFactory` with the context)
+  reads the HDMI audio capabilities and passes AC3/EAC3/DTS/TrueHD through when the TV/receiver supports them; anything
+  else is decoded by the bundled FFmpeg extension. The device profile already advertises these codecs
+  (`FORCED_AUDIO_CODECS`). Not verifiable on the emulator (no HDMI sink); check on a real TV with a receiver.
+- Play Store: no required hardware features in either flavor (`aapt2 dump badging`); bluetooth was implied by the
+  BLUETOOTH permission, now `required="false"`. Leanback launcher entry + banner with the app name are present.
+  Remaining TV quality items are UX ones covered above (d-pad everywhere except the out-of-scope download screens).
 
 ## Testing
 
