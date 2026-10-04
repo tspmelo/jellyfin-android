@@ -24,7 +24,7 @@ Notes from testing:
 - Make `exo_player_control_view.xml` buttons focusable with visible focused states; explicit focus order.
 - On TV: disable `PlayerGestureHelper`, lock screen, orientation/fullscreen toggle, PiP button.
 
-## Phase 3 — native screens (in progress)
+## Phase 3 — native screens ✅ done
 
 Done: battery-optimization snackbar hidden on TV, Chromecast disabled on TV, stronger focus highlight on player buttons.
 Back on the home page (web app calls `exitApp`): first focuses the page's `<nav>`, exits only from there (`focusNavOrExit`).
@@ -36,8 +36,11 @@ fixed nav bar only being reachable from the end of the page) belong upstream, no
 
 - ✅ Connect screen: Host field no longer traps d-pad up/down, buttons show a white focus border. Server list items untested
   (emulator discovers no servers). Nit: focusing the Host field opens the keyboard right away (Back closes it).
-- Settings (ModernAndroidPreferences): verify focus highlight.
-- On TV hide cast (`chrome.cast` injection, `castmenuhashchange`).
+- ✅ Settings: takes focus (all fragments added over the WebView now block focus below them, see
+  `MainActivity.updateFragmentFocus`), visible highlight, touch/rotation-only options hidden on TV.
+  Pre-existing bug (not TV-specific): Back doesn't close the choice dialogs; CANCEL works.
+- ✅ Cast: nothing more needed, `chrome.cast.js` is only served when the web app requests the Cast SDK, which it doesn't
+  once `hasChromecast()` is false.
 - Out of scope: download screens (`DownloadsScreen`).
 
 ## Phase 4 — later, if wanted

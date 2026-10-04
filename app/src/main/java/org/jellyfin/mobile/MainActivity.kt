@@ -10,12 +10,14 @@ import android.os.IBinder
 import android.provider.Settings
 import android.view.KeyEvent
 import android.view.OrientationEventListener
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
 import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.children
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.Fragment
@@ -143,6 +145,9 @@ class MainActivity : AppCompatActivity() {
         // Handle back presses
         onBackPressedDispatcher.addCallback(this, onBackPressed = onBackPressedCallback)
 
+        // Fragments are added on top of each other (see BackPressInterceptor), keep d-pad focus on the visible one
+        supportFragmentManager.addOnBackStackChangedListener { updateFragmentFocus() }
+
         // Setup Chromecast
         chromecast.initializePlugin(this)
     }
@@ -190,6 +195,24 @@ class MainActivity : AppCompatActivity() {
     override fun onSupportNavigateUp(): Boolean {
         onBackPressedDispatcher.onBackPressed()
         return true
+    }
+
+    /**
+     * Blocks focus in fragments covered by the topmost one, and moves focus into the topmost one.
+     * Otherwise d-pad navigation would continue in a covered fragment, e.g. the WebView below the player.
+     */
+    private fun updateFragmentFocus() {
+        val container = findViewById<ViewGroup>(R.id.fragment_container)
+        container.post {
+            val top = container.children.lastOrNull() ?: return@post
+            for (child in container.children.filterIsInstance<ViewGroup>()) {
+                child.descendantFocusability = when {
+                    child === top -> ViewGroup.FOCUS_BEFORE_DESCENDANTS
+                    else -> ViewGroup.FOCUS_BLOCK_DESCENDANTS
+                }
+            }
+            if (!top.hasFocus()) top.requestFocus()
+        }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {

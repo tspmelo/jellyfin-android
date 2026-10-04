@@ -21,7 +21,6 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.children
 import androidx.core.view.isVisible
 import androidx.core.view.setPadding
 import androidx.core.view.updatePadding
@@ -79,7 +78,6 @@ class PlayerFragment : Fragment(), BackPressInterceptor {
     private val toolbar: Toolbar get() = playerControlsBinding.toolbar
     private val fullscreenSwitcher: ImageButton get() = playerControlsBinding.fullscreenSwitcher
     private var playerMenus: PlayerMenus? = null
-    private var focusBlockedViews: List<ViewGroup> = emptyList()
 
     private lateinit var playerFullscreenHelper: PlayerFullscreenHelper
     lateinit var playerLockScreenHelper: PlayerLockScreenHelper
@@ -239,17 +237,7 @@ class PlayerFragment : Fragment(), BackPressInterceptor {
             fullscreenSwitcher.isVisible = false
             // Take focus from the WebView below, so d-pad keys reach the player
             playerView.isFocusable = true
-            // Must be attached to find siblings and take focus
-            playerView.post {
-                // Keep d-pad focus search from reaching the WebView below the player
-                focusBlockedViews = (view.parent as? ViewGroup)?.children
-                    ?.filterIsInstance<ViewGroup>()
-                    ?.filter { it !== view }
-                    ?.onEach { it.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS }
-                    ?.toList()
-                    .orEmpty()
-                playerView.requestFocus()
-            }
+            playerView.post { playerView.requestFocus() } // must be attached to take focus
             // Hiding the controls drops focus from their buttons, which would otherwise land on the WebView
             playerView.setControllerVisibilityListener(
                 PlayerView.ControllerVisibilityListener { visibility ->
@@ -493,10 +481,6 @@ class PlayerFragment : Fragment(), BackPressInterceptor {
         super.onDestroyView()
         // Detach player from PlayerView
         playerView.player = null
-
-        // Let the views below take focus again
-        focusBlockedViews.forEach { it.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS }
-        focusBlockedViews = emptyList()
 
         // Set binding references to null
         _playerBinding = null

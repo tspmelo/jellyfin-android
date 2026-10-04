@@ -29,6 +29,7 @@ import org.jellyfin.mobile.databinding.FragmentSettingsBinding
 import org.jellyfin.mobile.downloads.DownloadMethod
 import org.jellyfin.mobile.utils.BackPressInterceptor
 import org.jellyfin.mobile.utils.Constants
+import org.jellyfin.mobile.utils.isTv
 import org.jellyfin.mobile.utils.applyWindowInsetsAsMargins
 import org.jellyfin.mobile.utils.extensions.requireMainActivity
 import org.jellyfin.mobile.utils.isPackageInstalled
@@ -93,6 +94,7 @@ class SettingsFragment : Fragment(), BackPressInterceptor {
     @Suppress("LongMethod")
     private fun buildSettingsScreen() = screen(requireContext()) {
         collapseIcon = true
+        val isTv = requireContext().isTv
         categoryHeader(PREF_CATEGORY_MUSIC_PLAYER) {
             titleRes = R.string.pref_category_music_player
         }
@@ -133,10 +135,12 @@ class SettingsFragment : Fragment(), BackPressInterceptor {
             }
         }
         startLandscapeVideoInLandscapePreference = checkBox(Constants.PREF_EXOPLAYER_START_LANDSCAPE_VIDEO_IN_LANDSCAPE) {
+            visible = !isTv // touch or rotation only
             titleRes = R.string.pref_exoplayer_start_landscape_video_in_landscape
             enabled = appPreferences.videoPlayerType == VideoPlayerType.EXO_PLAYER
         }
         swipeGesturesPreference = checkBox(Constants.PREF_EXOPLAYER_ALLOW_SWIPE_GESTURES) {
+            visible = !isTv // touch or rotation only
             titleRes = R.string.pref_exoplayer_allow_brightness_volume_gesture
             enabled = appPreferences.videoPlayerType == VideoPlayerType.EXO_PLAYER
             defaultValue = true
@@ -145,6 +149,7 @@ class SettingsFragment : Fragment(), BackPressInterceptor {
             }
         }
         rememberBrightnessPreference = checkBox(Constants.PREF_EXOPLAYER_REMEMBER_BRIGHTNESS) {
+            visible = !isTv // touch or rotation only
             titleRes = R.string.pref_exoplayer_remember_brightness
             enabled = appPreferences.videoPlayerType == VideoPlayerType.EXO_PLAYER && appPreferences.exoPlayerAllowSwipeGestures
             defaultOnCheckedChange { checked ->
@@ -152,6 +157,7 @@ class SettingsFragment : Fragment(), BackPressInterceptor {
             }
         }
         pressSpeedUpPreference = checkBox(Constants.PREF_EXOPLAYER_ALLOW_PRESS_SPEED_UP) {
+            visible = !isTv // touch or rotation only
             titleRes = R.string.pref_exoplayer_allow_press_speed_up
             summaryRes = R.string.pref_exoplayer_allow_press_speed_up_summary
             enabled = appPreferences.videoPlayerType == VideoPlayerType.EXO_PLAYER
@@ -163,6 +169,7 @@ class SettingsFragment : Fragment(), BackPressInterceptor {
             enabled = appPreferences.videoPlayerType == VideoPlayerType.EXO_PLAYER
         }
         horizontalGesturePreference = checkBox(Constants.PREF_EXOPLAYER_ALLOW_HORIZONTAL_GESTURE) {
+            visible = !isTv // touch or rotation only
             titleRes = R.string.pref_exoplayer_allow_horizontal_gesture
             summaryRes = R.string.pref_exoplayer_allow_horizontal_gesture_summary
             enabled = appPreferences.videoPlayerType == VideoPlayerType.EXO_PLAYER
