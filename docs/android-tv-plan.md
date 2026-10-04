@@ -34,9 +34,11 @@ Note: custom frontends (e.g. AIOStreams) handle the d-pad themselves and ignore 
 fixed nav bar only being reachable from the end of the page) belong upstream, not in the app.
 
 
-- Compose (`ServerSelection`, `DownloadsScreen`): d-pad focus traversal + visible focus; URL entry with the IME.
+- ✅ Connect screen: Host field no longer traps d-pad up/down, buttons show a white focus border. Server list items untested
+  (emulator discovers no servers). Nit: focusing the Host field opens the keyboard right away (Back closes it).
 - Settings (ModernAndroidPreferences): verify focus highlight.
-- On TV hide cast (`chrome.cast` injection, `castmenuhashchange`) and probably downloads.
+- On TV hide cast (`chrome.cast` injection, `castmenuhashchange`).
+- Out of scope: download screens (`DownloadsScreen`).
 
 ## Phase 4 — later, if wanted
 

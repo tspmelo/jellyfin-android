@@ -1,6 +1,9 @@
 package org.jellyfin.mobile.ui.screens.connect
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +17,8 @@ import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -75,12 +80,17 @@ fun StyledTextButton(
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
     TextButton(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         enabled = enabled,
+        interactionSource = interactionSource,
+        // The default focus overlay is barely visible on a filled button (d-pad / TV)
+        border = if (focused) BorderStroke(3.dp, MaterialTheme.colors.onPrimary) else null,
         colors = ButtonDefaults.buttonColors(),
     ) {
         Text(text = text)

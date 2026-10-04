@@ -43,7 +43,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -216,12 +223,22 @@ private fun ServerUrlField(
     onTextChange: (String) -> Unit,
     onSubmit: () -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
     OutlinedTextField(
         value = text,
         onValueChange = onTextChange,
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 8.dp)
+            .onPreviewKeyEvent { keyEvent ->
+                // The text field would consume d-pad up/down, trapping focus (TV remotes)
+                when {
+                    keyEvent.type != KeyEventType.KeyDown -> false
+                    keyEvent.key == Key.DirectionDown -> focusManager.moveFocus(FocusDirection.Down)
+                    keyEvent.key == Key.DirectionUp -> focusManager.moveFocus(FocusDirection.Up)
+                    else -> false
+                }
+            }
             .onKeyEvent { keyEvent ->
                 when (keyEvent.nativeKeyEvent.keyCode) {
                     KeyEvent.KEYCODE_ENTER -> {
