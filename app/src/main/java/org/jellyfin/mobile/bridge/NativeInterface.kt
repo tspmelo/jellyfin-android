@@ -31,8 +31,10 @@ import org.jellyfin.mobile.utils.Constants.EXTRA_ITEM_ID
 import org.jellyfin.mobile.utils.Constants.EXTRA_PLAYER_ACTION
 import org.jellyfin.mobile.utils.Constants.EXTRA_POSITION
 import org.jellyfin.mobile.utils.Constants.EXTRA_TITLE
+import org.jellyfin.mobile.utils.isTv
 import org.jellyfin.mobile.webapp.RemotePlayerService
 import org.jellyfin.mobile.webapp.RemoteVolumeProvider
+import org.jellyfin.mobile.webapp.WebappFunctionChannel
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.util.AuthorizationHeaderBuilder
 import org.jellyfin.sdk.model.serializer.toUUID
@@ -48,6 +50,7 @@ class NativeInterface(private val context: Context) : KoinComponent {
     private val activityEventHandler: ActivityEventHandler = get()
     private val remoteVolumeProvider: RemoteVolumeProvider by inject()
     private val deviceProfileBuilder: DeviceProfileBuilder by inject()
+    private val webappFunctionChannel: WebappFunctionChannel by inject()
 
     @SuppressLint("HardwareIds")
     @JavascriptInterface
@@ -65,6 +68,7 @@ class NativeInterface(private val context: Context) : KoinComponent {
             put("deviceName", name)
             put("appName", clientInfo.name)
             put("appVersion", clientInfo.version)
+            put("isTv", context.isTv)
         }.toString()
     } catch (e: Exception) {
         null
@@ -74,7 +78,7 @@ class NativeInterface(private val context: Context) : KoinComponent {
     fun getCodecCapabilities(): String = deviceProfileBuilder.getWebCodecCapabilitiesJson()
 
     @JavascriptInterface
-    fun hasChromecast(): Boolean = BuildConfig.IS_PROPRIETARY
+    fun hasChromecast(): Boolean = BuildConfig.IS_PROPRIETARY && !context.isTv // no casting from a TV
 
     @JavascriptInterface
     fun enableFullscreen(): Boolean {
@@ -180,6 +184,16 @@ class NativeInterface(private val context: Context) : KoinComponent {
 
     @JavascriptInterface
     fun exitApp() {
+        if (context.isTv) {
+            // Back on the home page: focus the page's nav bar first, exit only from there (see nativeshell.js)
+            webappFunctionChannel.call("window.NativeShell.focusNavOrExit();")
+        } else {
+            emitEvent(ActivityEvent.ExitApp)
+        }
+    }
+
+    @JavascriptInterface
+    fun exitAppNow() {
         emitEvent(ActivityEvent.ExitApp)
     }
 

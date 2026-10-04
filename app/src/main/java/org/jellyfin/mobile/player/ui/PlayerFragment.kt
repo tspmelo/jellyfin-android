@@ -3,12 +3,14 @@ package org.jellyfin.mobile.player.ui
 import android.app.Activity
 import android.app.PictureInPictureParams
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.OrientationEventListener
 import android.view.View
@@ -19,6 +21,7 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.children
 import androidx.core.view.isVisible
 import androidx.core.view.setPadding
 import androidx.core.view.updatePadding
@@ -52,6 +55,7 @@ import org.jellyfin.mobile.utils.extensions.aspectRational
 import org.jellyfin.mobile.utils.extensions.getParcelableCompat
 import org.jellyfin.mobile.utils.extensions.isLandscape
 import org.jellyfin.mobile.utils.extensions.keepScreenOn
+import org.jellyfin.mobile.utils.isTv
 import org.jellyfin.mobile.utils.toast
 import org.jellyfin.sdk.model.api.MediaSegmentDto
 import org.jellyfin.sdk.model.api.MediaStream
@@ -75,6 +79,7 @@ class PlayerFragment : Fragment(), BackPressInterceptor {
     private val toolbar: Toolbar get() = playerControlsBinding.toolbar
     private val fullscreenSwitcher: ImageButton get() = playerControlsBinding.fullscreenSwitcher
     private var playerMenus: PlayerMenus? = null
+    private var focusBlockedViews: List<ViewGroup> = emptyList()
 
     private lateinit var playerFullscreenHelper: PlayerFullscreenHelper
     lateinit var playerLockScreenHelper: PlayerLockScreenHelper
@@ -227,6 +232,57 @@ class PlayerFragment : Fragment(), BackPressInterceptor {
         fullscreenSwitcher.setOnClickListener {
             toggleFullscreen()
         }
+
+        if (requireContext().isTv) {
+            // No touch or rotation on TV
+            playerControlsBinding.lockScreenButton.isVisible = false
+            fullscreenSwitcher.isVisible = false
+            // Take focus from the WebView below, so d-pad keys reach the player
+            playerView.isFocusable = true
+            // Must be attached to find siblings and take focus
+            playerView.post {
+                // Keep d-pad focus search from reaching the WebView below the player
+                focusBlockedViews = (view.parent as? ViewGroup)?.children
+                    ?.filterIsInstance<ViewGroup>()
+                    ?.filter { it !== view }
+                    ?.onEach { it.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS }
+                    ?.toList()
+                    .orEmpty()
+                playerView.requestFocus()
+            }
+            // Hiding the controls drops focus from their buttons, which would otherwise land on the WebView
+            playerView.setControllerVisibilityListener(
+                PlayerView.ControllerVisibilityListener { visibility ->
+                    if (visibility != View.VISIBLE) playerView.requestFocus()
+                },
+            )
+        }
+    }
+
+    /**
+     * Seek with d-pad left/right while the controls are hidden (TV remotes, keyboards).
+     * Consumes both down and up events, since [PlayerView] would show the controller on any d-pad event.
+     *
+     * @return true if the event was handled
+     */
+    fun onKeyEvent(event: KeyEvent): Boolean {
+        if (playerView.isControllerFullyVisible || !playerView.useController) return false
+        val seek: () -> Unit = when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> { { onRewind() } }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> { { onFastForward() } }
+            else -> return false
+        }
+        if (event.action == KeyEvent.ACTION_DOWN) seek()
+        return true
+    }
+
+    override fun onInterceptBackPressed(): Boolean {
+        // On TV, back hides the controls first instead of closing the player
+        if (requireContext().isTv && playerView.isControllerFullyVisible) {
+            playerView.hideController()
+            return true
+        }
+        return false
     }
 
     override fun onStart() {
@@ -376,7 +432,9 @@ class PlayerFragment : Fragment(), BackPressInterceptor {
     }
 
     fun onUserLeaveHint() {
-        if (AndroidVersion.isAtLeastN && viewModel.playerOrNull != null) {
+        val hasPip = requireContext().packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+        // Entering PiP throws on devices without it (e.g. many TVs)
+        if (AndroidVersion.isAtLeastN && hasPip && viewModel.playerOrNull != null) {
             requireActivity().enterPictureInPicture()
         }
     }
@@ -435,6 +493,10 @@ class PlayerFragment : Fragment(), BackPressInterceptor {
         super.onDestroyView()
         // Detach player from PlayerView
         playerView.player = null
+
+        // Let the views below take focus again
+        focusBlockedViews.forEach { it.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS }
+        focusBlockedViews = emptyList()
 
         // Set binding references to null
         _playerBinding = null

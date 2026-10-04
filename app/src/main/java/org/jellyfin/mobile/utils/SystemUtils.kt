@@ -32,9 +32,13 @@ import timber.log.Timber
 import java.util.UUID
 import kotlin.coroutines.resume
 
+val Context.isTv: Boolean
+    get() = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+
 fun WebViewFragment.requestNoBatteryOptimizations(rootView: CoordinatorLayout) {
     val powerManager = requireContext().getSystemService(Activity.POWER_SERVICE) as PowerManager
     if (
+        !requireContext().isTv && // phone-specific prompt, TVs are mains-powered
         !appPreferences.ignoreBatteryOptimizations &&
         !powerManager.isIgnoringBatteryOptimizations(BuildConfig.APPLICATION_ID)
     ) {

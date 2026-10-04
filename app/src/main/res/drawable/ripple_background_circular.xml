@@ -6,4 +6,14 @@
             <solid android:color="@android:color/white" />
         </shape>
     </item>
+    <!-- Visible focus for d-pad / keyboard navigation (TV) -->
+    <item>
+        <selector>
+            <item android:state_focused="true">
+                <shape android:shape="oval">
+                    <solid android:color="#66ffffff" />
+                </shape>
+            </item>
+        </selector>
+    </item>
 </ripple>

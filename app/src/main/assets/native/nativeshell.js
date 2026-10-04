@@ -31,7 +31,7 @@ for (const plugin of plugins) {
     };
 }
 
-const { deviceId, deviceName, appName, appVersion } = JSON.parse(window.NativeInterface.getDeviceInformation());
+const { deviceId, deviceName, appName, appVersion, isTv } =JSON.parse(window.NativeInterface.getDeviceInformation());
 const codecCaps = JSON.parse(window.NativeInterface.getCodecCapabilities());
 
 window.NativeShell = {
@@ -83,6 +83,19 @@ window.NativeShell = {
         return plugins;
     },
 
+    // TV only, called instead of exiting: move focus to the page's nav bar, exit if already there (or there is none)
+    focusNavOrExit() {
+        const navSelector = 'nav, [role="navigation"]';
+        const target = !document.activeElement?.closest(navSelector) && [...document.querySelectorAll(navSelector)]
+            .flatMap((nav) => [...nav.querySelectorAll('a[href], button, [tabindex]:not([tabindex="-1"])')])
+            .find((el) => el.checkVisibility());
+        if (target) {
+            target.focus();
+        } else {
+            window.NativeInterface.exitAppNow();
+        }
+    },
+
     async execCast(action, args, callback) {
         this.castCallbacks = this.castCallbacks || {};
         this.castCallbacks[action] = callback;
@@ -99,6 +112,35 @@ window.NativeShell = {
     }
 };
 
+// TV: up from the topmost content (e.g. a hero "Play" button) scrolls to the top and keeps focus,
+// instead of letting the web app jump into a side nav. Web apps may handle keys before this listener,
+// so it undoes their focus move within the same key press (before anything is painted).
+if (isTv) {
+    const NAV = 'nav, [role="navigation"]';
+    const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    let focusBeforeKey = null;
+    window.addEventListener('keyup', () => { focusBeforeKey = document.activeElement; }, true);
+    window.addEventListener('keydown', (e) => {
+        const active = focusBeforeKey;
+        if (e.key !== 'ArrowUp' || !active || !active.isConnected || active === document.body || active.closest(NAV)) return;
+        const top = active.getBoundingClientRect().top;
+        // Columns of side navs (taller than wide), which may hold more buttons outside the <nav> element
+        const sideColumns = [...document.querySelectorAll(NAV)].map((nav) => nav.getBoundingClientRect())
+            .filter((r) => r.height > r.width);
+        const contentAbove = [...document.querySelectorAll(FOCUSABLE)].some((el) => {
+            const r = el.getBoundingClientRect();
+            return el !== active && r.bottom <= top + 1
+                && !sideColumns.some((col) => r.left >= col.left - 1 && r.right <= col.right + 1)
+                && el.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+        });
+        if (contentAbove) return;
+        if (document.activeElement !== active) active.focus({ preventScroll: true });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        e.preventDefault();
+        e.stopImmediatePropagation();
+    }, true);
+}
+
 function getDeviceProfile(profileBuilder, item) {
     return profileBuilder();
 }
@@ -106,7 +148,7 @@ function getDeviceProfile(profileBuilder, item) {
 window.NativeShell.AppHost = {
     init() {},
     getDefaultLayout() {
-        return "mobile";
+        return isTv ? "tv" : "mobile";
     },
     supports(command) {
         command = command.toLowerCase();

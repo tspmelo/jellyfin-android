@@ -15,8 +15,10 @@ import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.doOnLayout
 import androidx.core.view.doOnNextLayout
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -44,6 +46,7 @@ import org.jellyfin.mobile.utils.extensions.getParcelableCompat
 import org.jellyfin.mobile.utils.extensions.replaceFragment
 import org.jellyfin.mobile.utils.fadeIn
 import org.jellyfin.mobile.utils.isOutdated
+import org.jellyfin.mobile.utils.isTv
 import org.jellyfin.mobile.utils.requestNoBatteryOptimizations
 import org.jellyfin.mobile.utils.runOnUiThread
 import org.koin.android.ext.android.inject
@@ -102,6 +105,8 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
                 runOnUiThread {
                     webViewBinding.loadingContainer.isVisible = false
                     webView.fadeIn()
+                    // Ensure d-pad / arrow keys reach the webapp on TV
+                    webView.requestFocus()
                 }
                 requestNoBatteryOptimizations(webViewBinding.root)
             }
@@ -147,6 +152,25 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
                         verticalCenter + offset,
                     ),
                 )
+            }
+        }
+
+        // TVs usually report 960dp wide, which web frontends treat as a phone. Lay the page out 1280 CSS px wide
+        // (desktop breakpoints) and scale the view down to fit the screen.
+        if (requireContext().isTv) {
+            val root = webViewBinding!!.root
+            root.doOnLayout {
+                val scale = root.width / (TV_WEB_WIDTH_DP * resources.displayMetrics.density)
+                if (scale < 1f) {
+                    webView.updateLayoutParams {
+                        width = (root.width / scale).toInt()
+                        height = (root.height / scale).toInt()
+                    }
+                    webView.pivotX = 0f
+                    webView.pivotY = 0f
+                    webView.scaleX = scale
+                    webView.scaleY = scale
+                }
             }
         }
 
@@ -264,3 +288,5 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
         fileChooserActivityLauncher.launch(intent)
     }
 }
+
+private const val TV_WEB_WIDTH_DP = 1280

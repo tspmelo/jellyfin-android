@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
+import android.view.KeyEvent
 import android.view.OrientationEventListener
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -189,6 +190,11 @@ class MainActivity : AppCompatActivity() {
     override fun onSupportNavigateUp(): Boolean {
         onBackPressedDispatcher.onBackPressed()
         return true
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val playerFragment = supportFragmentManager.fragments.find { it is PlayerFragment && it.isVisible } as PlayerFragment?
+        return playerFragment?.onKeyEvent(event) == true || super.dispatchKeyEvent(event)
     }
 
     override fun onUserLeaveHint() {
