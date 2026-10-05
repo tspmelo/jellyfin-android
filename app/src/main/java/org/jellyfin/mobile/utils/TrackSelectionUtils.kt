@@ -1,8 +1,10 @@
 package org.jellyfin.mobile.utils
 
+import androidx.media3.common.C
 import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import org.jellyfin.sdk.model.api.SubtitlePlaybackMode
 
 /**
  * Select the [trackGroup] of the specified [type] and ensure the type is enabled.
@@ -32,4 +34,26 @@ fun DefaultTrackSelector.clearSelectionAndDisableRendererByType(type: Int): Bool
     }
     setParameters(parameters)
     return true
+}
+
+/**
+ * Let the player pick subtitles from the file's own tracks as the user's subtitle [mode] and [language] ask,
+ * like the AIOStreams desktop app does with mpv.
+ */
+fun DefaultTrackSelector.Parameters.Builder.setSubtitleMode(
+    mode: SubtitlePlaybackMode?,
+    language: String?,
+): DefaultTrackSelector.Parameters.Builder = apply {
+    val preferredLanguage = language?.takeIf(String::isNotEmpty)
+    when (mode) {
+        SubtitlePlaybackMode.NONE -> setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        SubtitlePlaybackMode.ONLY_FORCED -> setIgnoredTextSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+        // Also take subtitles without a language tag, common in fansub releases
+        SubtitlePlaybackMode.ALWAYS -> {
+            setPreferredTextLanguage(preferredLanguage)
+            setSelectUndeterminedTextLanguage(true)
+        }
+        // ponytail: SMART acts like DEFAULT, skip subtitles over audio in the same language if needed
+        else -> setPreferredTextLanguage(preferredLanguage)
+    }
 }

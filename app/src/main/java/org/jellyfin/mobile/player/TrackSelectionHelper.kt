@@ -1,6 +1,7 @@
 package org.jellyfin.mobile.player
 
 import androidx.media3.common.C
+import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import org.jellyfin.mobile.player.source.ExternalSubtitleStream
 import org.jellyfin.mobile.player.source.JellyfinMediaSource
@@ -25,7 +26,24 @@ class TrackSelectionHelper(
         mediaSource.selectedAudioStream?.let { stream ->
             selectPlayerAudioTrack(mediaSource, stream, initial = true)
         }
-        selectSubtitleTrack(mediaSource, mediaSource.selectedSubtitleStream, initial = true)
+        // Without a subtitle to apply, leave the player's own pick from the file's flags and the user's preferences,
+        // unless subtitles were explicitly turned off. Servers that never probed the file (e.g. AIOStreams) pick none.
+        if (mediaSource.selectedSubtitleStream != null || mediaSource.subtitleStreamRequested) {
+            selectSubtitleTrack(mediaSource, mediaSource.selectedSubtitleStream, initial = true)
+        }
+    }
+
+    /**
+     * Select one of the player's own [tracks][group] of [type], or disable the type if [group] is null.
+     * Used for tracks the server didn't report.
+     */
+    fun selectPlayerTrack(type: Int, group: Tracks.Group?): Boolean {
+        val success = when (group) {
+            null -> trackSelector.clearSelectionAndDisableRendererByType(type)
+            else -> trackSelector.selectTrackByTypeAndGroup(type, group.mediaTrackGroup)
+        }
+        if (success) viewModel.logTracks()
+        return success
     }
 
     /**

@@ -28,6 +28,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.ui.PlayerView
 import io.github.peerless2012.ass.media.AssHandler
 import io.github.peerless2012.ass.media.widget.AssSubtitleView
@@ -134,6 +135,10 @@ class PlayerFragment : Fragment(), BackPressInterceptor {
             // Update title and player menus
             toolbar.title = mediaSource.getName(requireContext())
             playerMenus?.onQueueItemChanged(mediaSource, viewModel.queueManager.hasNext())
+        }
+        viewModel.tracks.observe(this) { tracks ->
+            val mediaSource = viewModel.mediaSourceOrNull ?: return@observe
+            playerMenus?.updateTrackMenus(mediaSource, tracks)
         }
 
         // Handle fragment arguments, extract playback options and start playback
@@ -371,6 +376,15 @@ class PlayerFragment : Fragment(), BackPressInterceptor {
         if (viewModel.trackSelectionHelper.selectSubtitleTrack(index)) {
             callback.onTrackSelected(true)
         }
+    }
+
+    /**
+     * Select one of the player's own tracks, or disable [type] if [group] is null.
+     *
+     * @param callback called if track selection was successful and UI needs to be updated
+     */
+    fun onPlayerTrackSelected(type: Int, group: Tracks.Group?, callback: TrackSelectionCallback) {
+        callback.onTrackSelected(viewModel.trackSelectionHelper.selectPlayerTrack(type, group))
     }
 
     /**

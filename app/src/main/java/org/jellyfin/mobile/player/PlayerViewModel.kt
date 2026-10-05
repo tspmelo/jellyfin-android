@@ -16,6 +16,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.Clock
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -66,6 +67,7 @@ import org.jellyfin.mobile.utils.getVolumeRange
 import org.jellyfin.mobile.utils.logTracks
 import org.jellyfin.mobile.utils.seekToOffset
 import org.jellyfin.mobile.utils.setPlaybackState
+import org.jellyfin.mobile.utils.setSubtitleMode
 import org.jellyfin.mobile.utils.toMediaMetadata
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.exception.ApiClientException
@@ -124,6 +126,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     val player: LiveData<ExoPlayer?> get() = _player
     val playerState: LiveData<Int> get() = _playerState
     val decoderType: LiveData<DecoderType> get() = _decoderType
+    private val _tracks = MutableLiveData<Tracks>()
+    val tracks: LiveData<Tracks> get() = _tracks
 
     // Player Menus
     private var playerMenuHelper: PlayerMenuHelper? = null
@@ -201,6 +205,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     userApi.getCurrentUser().content.configuration
                 }
                 autoPlayNextEpisodeEnabled = userConfig?.enableNextEpisodeAutoPlay ?: false
+                // Let the player pick from the file's own tracks like the user would, for tracks the server didn't report
+                trackSelector.setParameters(
+                    trackSelector.buildUponParameters()
+                        .setPreferredAudioLanguage(userConfig?.audioLanguagePreference)
+                        .setSubtitleMode(userConfig?.subtitleMode, userConfig?.subtitleLanguagePreference),
+                )
             } catch (e: ApiClientException) {
                 Timber.e(e, "Failed to load auto play preference")
             }
@@ -768,6 +778,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 }
             }
         }
+    }
+
+    override fun onTracksChanged(tracks: Tracks) {
+        _tracks.value = tracks
     }
 
     override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {

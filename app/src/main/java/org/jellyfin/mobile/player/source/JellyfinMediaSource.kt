@@ -41,6 +41,9 @@ sealed class JellyfinMediaSource(
     var selectedSubtitleStream: MediaStream? = null
         private set
 
+    // Whether playback was started with a subtitle choice, rather than leaving it to the defaults
+    val subtitleStreamRequested: Boolean = playbackDetails?.subtitleStreamIndex != null
+
     val selectedAudioStreamIndex: Int?
         get() = selectedAudioStream?.index
     val selectedSubtitleStreamIndex: Int

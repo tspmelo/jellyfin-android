@@ -15,7 +15,10 @@ import androidx.core.view.get
 import androidx.core.view.isVisible
 import androidx.core.view.size
 import androidx.core.view.updateLayoutParams
+import androidx.media3.common.C
+import androidx.media3.common.Tracks
 import androidx.media3.ui.DefaultTimeBar
+import androidx.media3.ui.DefaultTrackNameProvider
 import androidx.media3.ui.TimeBar
 import org.jellyfin.mobile.R
 import org.jellyfin.mobile.databinding.ExoPlayerControlViewBinding
@@ -28,6 +31,7 @@ import org.jellyfin.mobile.player.ui.playermenuhelper.PlayerMenuHelper
 import org.jellyfin.mobile.player.ui.playermenuhelper.SkipMediaSegmentButton
 import org.jellyfin.sdk.model.api.ChapterInfo
 import org.jellyfin.sdk.model.api.MediaStream
+import org.jellyfin.sdk.model.api.PlayMethod
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.util.Locale
@@ -74,6 +78,11 @@ class PlayerMenus(
     private var subtitleCount = 0
     private var subtitlesEnabled = false
 
+    // The player's own tracks, when the menu lists those instead of the server's media streams
+    private var playerAudioGroups: List<Tracks.Group>? = null
+    private var playerSubtitleGroups: List<Tracks.Group>? = null
+    private val trackNameProvider = DefaultTrackNameProvider(context.resources)
+
     private val trickplayHelper = TrickplayHelper(
         trickplayContainer,
         trickplayThumbnail,
@@ -117,8 +126,13 @@ class PlayerMenus(
             audioStreamsMenu.show()
         }
         subtitlesButton.setOnClickListener {
+            val playerGroups = playerSubtitleGroups
             when (subtitleCount) {
                 0 -> return@setOnClickListener
+                1 if playerGroups != null -> {
+                    val group = if (subtitlesEnabled) null else playerGroups.first()
+                    fragment.onPlayerTrackSelected(C.TRACK_TYPE_TEXT, group) {}
+                }
                 1 -> {
                     fragment.toggleSubtitles { enabled ->
                         subtitlesEnabled = enabled
@@ -165,28 +179,10 @@ class PlayerMenus(
         setChapterMarkings(chapters, runTimeTicks)
 
         val videoStream = mediaSource.selectedVideoStream
-
         val audioStreams = mediaSource.audioStreams
-        buildMenuItems(
-            audioStreamsMenu.menu,
-            AUDIO_MENU_GROUP,
-            audioStreams,
-            mediaSource.selectedAudioStream,
-        )
 
-        val subtitleStreams = mediaSource.subtitleStreams
-        val selectedSubtitleStream = mediaSource.selectedSubtitleStream
-        buildMenuItems(
-            subtitlesMenu.menu,
-            SUBTITLES_MENU_GROUP,
-            subtitleStreams,
-            selectedSubtitleStream,
-            true,
-        )
-        subtitleCount = subtitleStreams.size
-        subtitlesEnabled = selectedSubtitleStream != null
-
-        updateSubtitlesButton()
+        // The new item's tracks aren't known until the player reports them
+        updateTrackMenus(mediaSource, Tracks.EMPTY)
 
         val height = videoStream?.height
         val width = videoStream?.width
@@ -277,6 +273,12 @@ class PlayerMenus(
             // When transcoding, the updated media source will cause the menu to be rebuilt
             clickedItem.isChecked = true
 
+            playerSubtitleGroups?.let { groups ->
+                // The itemId is the index in the player's tracks, the menu is rebuilt when they change
+                fragment.onPlayerTrackSelected(C.TRACK_TYPE_TEXT, groups.getOrNull(clickedItem.itemId)) {}
+                return@setOnMenuItemClickListener true
+            }
+
             // The itemId is the MediaStream.index of the track
             val selectedSubtitleStreamIndex = clickedItem.itemId
             fragment.onSubtitleSelected(selectedSubtitleStreamIndex) {
@@ -293,6 +295,13 @@ class PlayerMenus(
             // Immediately apply changes to the menu, necessary when direct playing
             // When transcoding, the updated media source will cause the menu to be rebuilt
             clickedItem.isChecked = true
+
+            val playerGroups = playerAudioGroups
+            if (playerGroups != null) {
+                // The itemId is the index in the player's tracks
+                fragment.onPlayerTrackSelected(C.TRACK_TYPE_AUDIO, playerGroups[clickedItem.itemId]) {}
+                return@setOnMenuItemClickListener true
+            }
 
             // The itemId is the MediaStream.index of the track
             fragment.onAudioTrackSelected(clickedItem.itemId) {}
@@ -352,6 +361,71 @@ class PlayerMenus(
 
     fun updatedSelectedDecoder(type: DecoderType) {
         decoderMenu.menu.findItem(type.ordinal).isChecked = true
+    }
+
+    /**
+     * Fill the audio and subtitle menus. They list the server's media streams, unless the player found more tracks
+     * in the file than the server knows of, as with streams the server never probed (e.g. AIOStreams):
+     * then they list the player's own tracks, like players that read the file themselves do.
+     */
+    fun updateTrackMenus(mediaSource: JellyfinMediaSource, tracks: Tracks) {
+        fun playerGroups(type: Int, serverCount: Int) = tracks.groups
+            .filter { group -> group.type == type && group.isSupported }
+            .takeIf { groups -> mediaSource.playMethod != PlayMethod.TRANSCODE && groups.size > serverCount }
+
+        playerAudioGroups = playerGroups(C.TRACK_TYPE_AUDIO, mediaSource.audioStreams.size)
+        playerAudioGroups?.let { groups ->
+            buildPlayerTrackMenuItems(audioStreamsMenu.menu, AUDIO_MENU_GROUP, groups)
+        } ?: buildMenuItems(
+            audioStreamsMenu.menu,
+            AUDIO_MENU_GROUP,
+            mediaSource.audioStreams,
+            mediaSource.selectedAudioStream,
+        )
+
+        playerSubtitleGroups = playerGroups(C.TRACK_TYPE_TEXT, mediaSource.subtitleStreams.size)
+        val subtitleGroups = playerSubtitleGroups
+        if (subtitleGroups != null) {
+            buildPlayerTrackMenuItems(subtitlesMenu.menu, SUBTITLES_MENU_GROUP, subtitleGroups, showNone = true)
+            subtitleCount = subtitleGroups.size
+            subtitlesEnabled = subtitleGroups.any(Tracks.Group::isSelected)
+        } else {
+            val selectedSubtitleStream = mediaSource.selectedSubtitleStream
+            buildMenuItems(
+                subtitlesMenu.menu,
+                SUBTITLES_MENU_GROUP,
+                mediaSource.subtitleStreams,
+                selectedSubtitleStream,
+                true,
+            )
+            subtitleCount = mediaSource.subtitleStreams.size
+            subtitlesEnabled = selectedSubtitleStream != null
+        }
+        updateSubtitlesButton()
+    }
+
+    /**
+     * Like [buildMenuItems], for the player's tracks: the item id is the index in [groups].
+     */
+    private fun buildPlayerTrackMenuItems(
+        menu: Menu,
+        groupId: Int,
+        groups: List<Tracks.Group>,
+        showNone: Boolean = false,
+    ) {
+        menu.clear()
+        val itemNone = when {
+            showNone -> menu.add(groupId, -1, Menu.NONE, fragment.getString(R.string.menu_item_none))
+            else -> null
+        }
+        var selectedItem: MenuItem? = itemNone
+        groups.forEachIndexed { index, group ->
+            val title = trackNameProvider.getTrackName(group.getTrackFormat(0))
+            val item = menu.add(groupId, index, Menu.NONE, title)
+            if (group.isSelected) selectedItem = item
+        }
+        menu.setGroupCheckable(groupId, true, true)
+        (selectedItem ?: menu.findItem(0))?.isChecked = true
     }
 
     private fun buildMenuItems(
